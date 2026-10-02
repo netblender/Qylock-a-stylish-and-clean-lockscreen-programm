@@ -1,0 +1,171 @@
+================================================================================
+ QYLOCK - COMMAND REFERENCE
+ Lockscreen (Quickshell) + theme picker + optional SDDM login screen
+================================================================================
+
+Install location: ~/user_scripts/hyprlock/
+
+
+--------------------------------------------------------------------------------
+ 1. INSTALL THE LOCKSCREEN + PICKER        (no sudo, run as you)
+--------------------------------------------------------------------------------
+    ~/user_scripts/hyprlock/qylock-install.sh
+
+    Installs packages if any are missing (asks for sudo once), clones the 41
+    themes, deploys the runtime, installs the picker app and adds a
+    "Qylock Theme Picker" entry to your app launcher.
+
+    Options:
+      --theme <name>        set the lock theme, e.g. --theme sword
+      --update              git pull the themes, then redeploy
+      --with-hypridle       also switch hypridle's idle-lock to qylock
+                            (OFF by default - your Hyprland config is not
+                             touched unless you pass this)
+      --no-deps             fail instead of installing missing packages
+      --dry-run             print the plan, change nothing
+      -h, --help            full help
+
+    Examples:
+      ~/user_scripts/hyprlock/qylock-install.sh
+      ~/user_scripts/hyprlock/qylock-install.sh --theme pixel-sakura
+      ~/user_scripts/hyprlock/qylock-install.sh --dry-run
+
+
+--------------------------------------------------------------------------------
+ 2. INSTALL THE LOGIN SCREEN (GREETER)     (needs sudo)
+--------------------------------------------------------------------------------
+    Run this only AFTER step 1 has been run.
+
+    sudo ~/user_scripts/hyprlock/qylock-greeter.sh
+    sudo ~/user_scripts/hyprlock/qylock-greeter.sh sword
+
+    With no argument it installs whatever skin your in-session lock is using.
+
+    Copies the skin to /usr/share/sddm/themes/qylock and writes
+    /etc/sddm.conf.d/99-qylock.conf. Your existing theme config
+    (10-dusky-theme.conf) is NOT modified.
+
+    Options:
+      --undo                remove the override and restore your old greeter
+      -h, --help            full help
+
+    IMPORTANT: test it BEFORE rebooting:
+      sddm-greeter-qt6 --test-mode --theme /usr/share/sddm/themes/qylock
+
+    Use the ABSOLUTE path. With just "--theme qylock" SDDM resolves the name
+    against the temp config it writes in /tmp, fails to find it, and shows a
+    "cannot be loaded" error. That is a test-mode quirk, not a real fault.
+
+    Then either reboot, or:
+      sudo systemctl restart sddm
+
+
+--------------------------------------------------------------------------------
+ 3. DAILY USE
+--------------------------------------------------------------------------------
+    Lock the screen now
+      ~/user_scripts/hyprlock/lock.sh
+
+    Lock with hyprlock instead (your old awww-wallpaper behaviour)
+      ~/user_scripts/hyprlock/lock.sh hyprlock
+
+    Lock with a one-off theme, without changing your default
+      ~/user_scripts/hyprlock/lock.sh pixel-sakura
+
+    Open the theme picker (or search "Qylock" in your app launcher)
+      ~/user_scripts/hyprlock/qylock_picker.sh
+
+    Default keyboard shortcut
+      SUPER + M
+
+
+--------------------------------------------------------------------------------
+ 4. UNDO / RECOVERY
+--------------------------------------------------------------------------------
+    Remove the login-screen change (restores your dusky greeter + its
+    on-screen keyboard):
+      sudo rm /etc/sddm.conf.d/99-qylock.conf
+
+    Or, same thing, via the script:
+      sudo ~/user_scripts/hyprlock/qylock-greeter.sh --undo
+
+    Switch the in-session lock back to hyprlock:
+      ~/.config/hypr/hypridle.conf   ->  lock_cmd = pidof hyprlock || hyprlock
+      ~/user_scripts/hyprlock/lock.sh hyprlock
+
+    Restore the lock dispatcher as it was before this install:
+      cp ~/user_scripts/hyprlock/lock.sh.orig ~/user_scripts/hyprlock/lock.sh
+
+    Remove everything (keep nothing):
+      rm -rf ~/.local/share/qylock-src \
+             ~/.local/share/quickshell-lockscreen \
+             ~/.config/qylock ~/.cache/qylock \
+             ~/.local/share/applications/qylock_picker.desktop
+      sudo rm -f /etc/sddm.conf.d/99-qylock.conf
+      sudo rm -rf /usr/share/sddm/themes/qylock
+
+    NOTE: deleting /etc/sddm.conf.d/99-qylock.conf is always safe and is the
+    way out if the login screen ever misbehaves. SDDM also falls back to a
+    working greeter if a skin fails to load, so you can still log in.
+
+    If you cannot reach a graphical login:
+      Ctrl+Alt+F2, log in at the TTY, then run the sudo rm above, then
+      sudo systemctl restart sddm
+
+
+--------------------------------------------------------------------------------
+ 5. FILES
+--------------------------------------------------------------------------------
+    Scripts
+      ~/user_scripts/hyprlock/qylock-install.sh     step 1
+      ~/user_scripts/hyprlock/qylock-greeter.sh     step 2
+      ~/user_scripts/hyprlock/qylock_picker.py      the picker app
+      ~/user_scripts/hyprlock/preview_shell.qml     live preview window
+
+    Data
+      ~/.config/qylock/theme          active lock theme (one line)
+      ~/.local/share/qylock-src/      theme checkout
+      ~/.local/share/quickshell-lockscreen/
+                                      runtime: lock.sh, lock_shell.qml,
+                                      preview_shell.qml, imports/, shim/
+
+    Cache
+      ~/.cache/qylock/thumbs/         generated theme thumbnails
+      (delete it and reopen the picker to regenerate)
+
+    System (only after step 2)
+      /usr/share/sddm/themes/qylock/          installed login skin
+      /etc/sddm.conf.d/99-qylock.conf         SDDM override
+
+    Backups the installer leaves behind
+      ~/user_scripts/hyprlock/lock.sh.orig
+      ~/.config/hypr/hypridle.conf.orig
+      /usr/share/sddm/themes/qylock.bak.<timestamp>/
+
+
+--------------------------------------------------------------------------------
+ 6. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+    Picker shows blank/black thumbnails
+      rm -rf ~/.cache/qylock/thumbs && ~/user_scripts/hyprlock/qylock_picker.sh
+
+    Video themes look black at the login screen
+      Video skins need qt6-multimedia + qt6-multimedia-ffmpeg. The installer
+      checks for this. A warning like
+      "Failed to open VDPAU backend libvdpau_nvidia.so" is harmless - it just
+      falls back to software decoding.
+
+    On-screen keyboard covers half the login screen
+      Already handled: qylock-greeter.sh clears InputMethod and
+      QT_IM_MODULE for qylock only, because qylock skins focus the password
+      field on load.
+
+    Themes look mostly black in the picker
+      Expected for a few skins (clockwork/orbital, clockwork/tape, nothing):
+      they ship no background image, so their thumbnail is a real capture of
+      the rendered theme, which is mostly dark.
+
+    Check the picker for errors
+      ~/user_scripts/hyprlock/qylock_picker.sh 2>&1 | head -20
+
+================================================================================
